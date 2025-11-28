@@ -50,7 +50,7 @@ void list_todos() {
 }
 
 
-void add_todo() {
+void add_task() {
 	clear_screen();
 
 	char description[MAX_DESCRIPTION_LENGTH];
@@ -85,20 +85,18 @@ void add_todo() {
 
 	// copy description and terminate the end
 	strncpy(new_item->description, description, MAX_DESCRIPTION_LENGTH - 1);
-	new_item->description[MAX_DESCRIPTION_LENGTH - 1] = '\0';
+	// new_item->description[MAX_DESCRIPTION_LENGTH - 1] = '\0';
 
 	new_item->id = next_id;
 	new_item->completed = false;
 
-	if (todo_list_head == NULL) {
-		todo_list_head = new_item;
-	} else {
-		todo_item *current = todo_list_head;
-		while (current->next != NULL) {
-			current = current->next;
-		}
-		current->next = new_item;
+	todo_item **current = &todo_list_head;
+
+	while (*current != NULL) {
+		current = &(*current)->next;
 	}
+	*current = new_item;
+	
 	
 	++todo_count;
 	++next_id;
@@ -188,7 +186,7 @@ void mark_as_complete() {
 
 }
 
-void save_to_file() {
+void save_tasks() {
 	clear_screen();
 
 	FILE *file = fopen(FILENAME, "w");
@@ -219,76 +217,48 @@ void save_to_file() {
 	wait_for_enter();
 }
 
-void load_from_file() {
+void load_tasks() {
 	FILE *file = fopen(FILENAME, "r");
-
 	if (file == NULL) {
-		perror("Error: Could not open save file.\n");
+		clear_screen();
+		perror("Error: Could not find and open save file.\n");
 		wait_for_enter();
 		return;
 	}
-	
-	// free any todo items from memory.
-	free_todo_list();
-	
-	char line[MAX_DESCRIPTION_LENGTH + 50]; // ??
-	char loaded_description[MAX_DESCRIPTION_LENGTH];
-	int loaded_id, loaded_completed;
-	int max_id_found = 0;
-	
-	// create a double pointer to load the todo items
+
+
+	char buffer[512];
+	int max_id = 0;
 	todo_item **current = &todo_list_head;
 
-	while (fgets(line, sizeof(line, file) != NULL)) {
-		char* first_semi = strchr(line, ';');
-		if (first_semi == NULL) {
-			fprintf(stderr, "Warning: Skipping malformed line in file (missing first ';'); %s\n", line);
+	while (fgets(buffer, sizeof(buffer), file)) {
+		int loaded_id, loaded_completed;
+		char loaded_description[MAX_DESCRIPTION_LENGTH];
+
+		if (sscanf(buffer, "%d;%d;%[^\n]", &loaded_id, &loaded_completed, loaded_description) != 3) {
 			continue;
 		}
-		// null terminate the ID part
-		*first_semi = '\0';
-		// convert ID string to integer "1" -> 1
-		loaded_id = atoi(line);
-
-		// find the second semicolon to parse completion status
-		char *second_semi = strchr(first_semi + 1, '\');
-		if (second_semi == NULL) {
-			fprintf(stderr, "Warning: Skipping malformed line in file (missing second ';'): %s\n", line);
-			continue;
-	       	}
-
 		
-		// null terminate the completed status part
-		*second_semi = '\0';
-		// convert status string to integer
-		load_completed = atoi(first_semi + 1); 
-		
-		// get the description section and remove trailing newline
-		strncpy(loaded_description, second_semi + 1, sizeof(loaded_description) - 1);
-		loaded_description[sizeof(loaded_description) - 1] = '\0';
-		loaded_description[strcspn(loaded_description, "\n")] = 0;
-
-		// allocate memory for the todo item
 		*current = malloc(sizeof(todo_item));
 		(*current)->id = loaded_id;
 		(*current)->completed = loaded_completed;
-		(*current)->description = loaded_description;
-		
-		// move to the next node
-		*current = (*current)->next;
-		
-		++todo_count;
+		strncpy((*current)->description, loaded_description, MAX_DESCRIPTION_LENGTH);
+		(*current)->next = NULL;
 
-		// update the upcoming ID with the largest id found
-		if (loaded_id >= max_id_found) {
-			max_id_found = loaded_id;
+
+		current = &(*current)->next;
+
+		++todo_count;
+		if (loaded_id > max_id) {
+			max_id = loaded_id;
 		}
-	}	
-	next_id = max_id_found;
+	}
+	next_id = ++max_id;
 
 	fclose(file);
-	printf("Info: Loaded %d todos from '%s'.\n", todo_count, FILENAME);
-
+	
+	clear_screen();
+	list_todos();
 }	
 
 void free_todo_list() {
@@ -306,6 +276,7 @@ void free_todo_list() {
 int main(void) {
 
 	int choice;
+	load_tasks();
 	do {
 		clear_screen();
 		printf("\n--- Todo List Application ---\n");
@@ -327,7 +298,7 @@ int main(void) {
 
 		switch (choice) {
 			case 1:
-				add_todo();
+				add_task();
 				break;
 			case 2:
 				remove_todo();
@@ -339,7 +310,7 @@ int main(void) {
 				list_todos();
 				break;
 			case 5:
-				save_to_file();
+				save_tasks();
 				break;
 			case 6:
 				printf("Exiting application. Have a great day.\n");
