@@ -290,6 +290,7 @@ int main(void) {
 	
 		if (scanf("%d", &choice) != 1) {
 			printf("Invalid input. Please enter a number.\n");
+			continue;
 		}
 
 		// clean left over newline character
